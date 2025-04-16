@@ -1,0 +1,55 @@
+
+globals:
+  javascript: |
+    function escapeSlash(val){
+      return val.replace("/", "\\/")
+    }
+
+scripts:
+  # MISE
+  install-mise: #https://mise.jdx.dev/getting-started.html
+    - sh:
+        command: mise help
+        silent: true
+        ignore-exit-code: true
+    - regex: ".*command not found"
+      then:
+        - sh: curl https://mise.run | sh
+          then:
+            - regex: "installed successfully"
+              else:
+                - abort: failed to install Mise
+
+  sdk-select-java:
+    - script: install-mise
+    - sh: mise use -g java@${{JAVA_VERSION:temurin-21.0.5+11.0.LTS}}
+    # mainly for debugging purposes
+    - sh: java -version
+
+  sdk-select-jbang:
+    - script: install-mise
+    - sh: mise use -g jbang@${{JBANG_VERSION:0.125.1}}
+
+  parse-pidstat-results:
+    # PIDSTAT_FILE: pidstat file to parse
+    # MAX_STATE: where to save the max result
+    # AVG_STATE: where to save the avg result
+    - sh: echo $(cat ${{PIDSTAT_FILE}} | awk '{print $9}')
+      silent: true
+      then:
+        - js: |
+            (input, state) => {
+              let cpuResults = input.split(" ").map(v => parseFloat(v)).filter(v => !Number.isNaN(v))
+              if (cpuResults.length > 0) {
+                // max cpu usage
+                state.${{MAX_STATE}} = Math.max(...cpuResults)
+                // avg cpu usage
+                state.${{AVG_STATE}} = cpuResults.reduce((all, v) => all + v, 0) / cpuResults.length
+              } else {
+                state.${{MAX_STATE}} = "NaN"
+                state.${{AVG_STATE}} = "NaN"
+              }
+            }
+
+states:
+  USE_SDKMAN: false

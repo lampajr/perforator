@@ -1,0 +1,190 @@
+scripts:
+  run-pidstat:
+    # FILE_ID: a name to identify the generated file if multiple runs
+    - js: ${{PIDSTAT_ENABLED}}
+      then:
+        - wait-for: HF_BENCHMARK_STARTED
+        - log: starting pidstat against ${{RUN.SUT_PID}}..
+        - sh: pidstat -p ${{RUN.SUT_PID}} ${{PIDSTAT_PARAMS}} > /tmp/pidstat_${{FILE_ID:all}}.log & export SUT_PIDSTAT_PID="$!"
+        - queue-download: /tmp/pidstat_${{FILE_ID:all}}.log
+        - wait-for: BENCHMARK_TERMINATED
+          then:
+            - sh: kill ${SUT_PIDSTAT_PID} || echo "pidstat already stopped"
+
+  # measure RSS
+  run-pmap:
+    # FILE_ID: a name to identify the generated file if multiple runs
+    - js: ${{PMAP_ENABLED}}
+      then:
+        - wait-for: HF_BENCHMARK_STARTED
+        - queue-download: /tmp/rss_${{FILE_ID:all}}.log
+        - repeat-until: BENCHMARK_TERMINATED
+          then:
+            - sh: echo -n "$(date +"%I:%M:%S %p")  " >> /tmp/rss_${{FILE_ID:all}}.log
+            - sh:
+                # NOTE: with docker this requires starting the containers with the same host user, this is now sets by default with
+                # --user "$(id -u):$(id -g)"
+                command: pmap -x ${{RUN.SUT_PID}} ${{PMAP_PARAMS:}} 2>/dev/null | grep total >> /tmp/rss_${{FILE_ID:all}}.log
+                ignore-exit-code: true
+            - sleep: 1s
+
+  run-strace:
+    # FILE_ID: a name to identify the generated file if multiple runs
+    - js: ${{STRACE_ENABLED}}
+      then:
+        - wait-for: HF_BENCHMARK_STARTED
+        - log: starting strace against ${{RUN.SUT_PID}}..
+        - sh: strace -p ${{RUN.SUT_PID}} ${{STRACE_PARAMS:}} 2> /tmp/strace_${{FILE_ID:all}}.log & export SUT_STRACE_PID="$!"
+        - queue-download: /tmp/FIGHTS_strace_${{FILE_ID:all}}.log
+        - wait-for: BENCHMARK_TERMINATED
+          then:
+            - sh: kill ${SUT_STRACE_PID} || echo "strace already stopped"
+
+  run-perfstat:
+    # FILE_ID: a name to identify the generated file if multiple runs
+    - js: ${{PERFSTAT_ENABLED}}
+      then:
+        - wait-for: HF_BENCHMARK_STARTED
+        - queue-download: /tmp/perfstat_${{FILE_ID:all}}.log
+        - log: starting perf stat against ${{RUN.SUT_PID}}..
+        - sh: perf stat -d -p ${{RUN.SUT_PID}} ${{PERFSTAT_PARAMS:}} -o /tmp/perfstat_${{FILE_ID:all}}.log
+          silent: true # Prevent the 'Nanny found idle' warnings
+          watch:
+            - regex: Problems finding threads of monitor
+              then:
+                - abort: Failed to start perf, unable to find provided pid ${{RUN.SUT_PID}}
+          on-signal:
+            BENCHMARK_TERMINATED:
+              - log: Stopping perf
+              - ctrlC
+
+  run-vmstat:
+    - js: ${{VMSTAT_ENABLED}}
+      then:
+        - wait-for: HF_BENCHMARK_STARTED
+        - log: starting vmstat..
+        - sh: vmstat ${{VMSTAT_PARAMS}} > /tmp/vmstat.log & export VMSTAT_PID="$!"
+        - queue-download: /tmp/vmstat.log
+        - wait-for: BENCHMARK_TERMINATED
+          then:
+            - sh: kill ${VMSTAT_PID} || echo "vmstat already stopped"
+
+  run-mpstat:
+    - js: ${{MPSTAT_ENABLED}}
+      then:
+        - wait-for: HF_BENCHMARK_STARTED
+        - log: starting mpstat..
+        - sh: mpstat ${{MPSTAT_PARAMS}} > /tmp/mpstat.log & export MPSTAT_PID="$!"
+        - queue-download: /tmp/mpstat.log
+        - wait-for: BENCHMARK_TERMINATED
+          then:
+            - sh: kill ${MPSTAT_PID} || echo "mpstat already stopped"
+
+  # application profiling
+  app-prof-setup:
+    - js: ${{APP_PROF_ENABLED}}
+      then:
+        - sh: ${{SUDOER}} sh -c "echo 1 > /proc/sys/kernel/perf_event_paranoid" || echo "Unable to set perf_event_paranoid"
+        - sh: ${{SUDOER}} sh -c "echo 0 > /proc/sys/kernel/kptr_restrict" || echo "Unable to unset kptr_restrict"
+        - script: asprof-setup
+
+  # async profiler
+  asprof-setup:
+    - js: ${{APP_PROF_ENABLED}}
+      then:
+        # override container runtimes to include asprof volumes
+        - set-state: CONTAINER_RUNTIME_PARAMS ${{CONTAINER_RUNTIME_PARAMS}} -v ${{ASPROF_DIR}}:${{ASPROF_DIR}}:rw,Z -v ${{ASPROF_OUT_DIR}}:${{ASPROF_OUT_DIR}}:rw,Z
+        - sh: if [ -d ${{ASPROF_DIR}} ]; then rm -rf ${{ASPROF_DIR}}; fi
+        - sh: curl -L ${{ASPROF_RELEASE_URL}} > /tmp/async-profiler.tgz
+        - sh: tar -xvf /tmp/async-profiler.tgz -C /tmp
+        - sh: mv /tmp/async-profiler-${{ASPROF_VERSION:3.0}}-linux-x64 ${{ASPROF_DIR:/tmp/async-profiler}}
+        # cleanup downloaded tar
+        - sh: rm -rf /tmp/async-profiler.tgz
+        - set-state: RUN.ASPROF_EXEC ${{ASPROF_DIR:/tmp/async-profiler}}/bin/asprof
+        - sh: if [ -d ${{ASPROF_OUT_DIR}} ]; then rm -rf ${{ASPROF_OUT_DIR}}; fi
+        - sh: mkdir -p ${{ASPROF_OUT_DIR}} && chmod 777 ${{ASPROF_OUT_DIR}} || echo "Cannot create ${{ASPROF_OUT_DIR}} directory"
+
+  run-app-prof:
+    - js: ${{APP_PROF_ENABLED}}
+      then:
+        - script: run-asprof
+
+  run-asprof:
+    # Relies on existing async-profiler executable located at ASPROF_EXEC
+    # FILE_ID: a name to identify the generated file if multiple runs
+    - wait-for: HF_BENCHMARK_STARTED
+    - log: Starting application level profiling for JVM ${{RUN.SUT_PID}}...
+    - sh: ${{SUDOER}} ${{ASPROF_EXEC:/tmp/async-profiler/bin/asprof}} start -e ${{ASPROF_EVENT}} --fdtransfer ${{ASPROF_PARAMS:}} ${{RUN.SUT_PID}}
+    - log: Async profiler started, waiting for BENCHMARK_TERMINATED stop signal...
+    - wait-for: BENCHMARK_TERMINATED
+    - sh: ${{SUDOER}} ${{ASPROF_EXEC:/tmp/async-profiler/bin/asprof}} stop -f ${{ASPROF_OUT_DIR}}/asprof_${{FILE_ID:all}} -o ${{ASPROF_FORMAT:flamegraph}} --title '${{ASPROF_EVENT}} profiling' ${{RUN.SUT_PID}}
+    - log: Stopped application level profiling
+    # Rename the output file based on the provided format file extension
+    - set-state: FILE_EXTENSION ${{= ${{ASPROF_FORMATS}}['${{ASPROF_FORMAT:flamegraph}}'] }}
+    - sh: mv ${{ASPROF_OUT_DIR}}/asprof_${{FILE_ID:all}} ${{ASPROF_OUT_DIR}}/asprof_${{FILE_ID:all}}.${{FILE_EXTENSION}}
+    - queue-download: ${{ASPROF_OUT_DIR}}/asprof_${{FILE_ID:all}}.${{FILE_EXTENSION}}
+
+  # parse the metrics from the generated profiling files and set them to
+  # qDup states so that they can easily be exported
+  # RSS at the end
+  # RSS (min, max, mean)
+  # CPU usage (min, max, mean)
+  # vmstat? mpstat?
+  export-metrics:
+    # stats for pidstat
+    - js: ${{PIDSTAT_ENABLED}}
+      then:
+        - wait-for: HF_BENCHMARK_STARTED
+        - script: parse-pidstat-results
+          with:
+            PIDSTAT_FILE: /tmp/HEROES_pidstat_${{FILE_ID:all}}.log
+            MAX_STATE: ${{FILE_ID:all}}_HEROES_CPU_USAGE_MAX
+            AVG_STATE: ${{FILE_ID:all}}_HEROES_CPU_USAGE_AVG
+
+  cleanup-profiling:
+    - sh:
+        command: rm -rf /tmp/vmstat.log /tmp/mpstat.log /tmp/*rss*.log /tmp/*pidstat*.log /tmp/*perfstat_${{FILE_ID:all}}.log
+        ignore-exit-code: true
+    - sh:
+        command: if [ -d ${{ASPROF_DIR}} ]; then rm -rf ${{ASPROF_DIR}}; fi
+        ignore-exit-code: true
+    - sh:
+        command: if [ -d ${{ASPROF_OUT_DIR}} ]; then rm -rf ${{ASPROF_OUT_DIR}}; fi
+        ignore-exit-code: true
+
+states:
+  SUDOER:
+
+  PIDSTAT_ENABLED: false
+  PIDSTAT_PARAMS: "1"
+
+  PMAP_ENABLED: false
+  PMAP_PARAMS:
+
+  STRACE_ENABLED: false
+  STRACE_PARAMS: -s 99 -ff
+
+  PERFSTAT_ENABLED: false
+  PERFSTAT_PARAMS:
+
+  VMSTAT_ENABLED: false
+  VMSTAT_PARAMS: "1"
+
+  MPSTAT_ENABLED: false
+  MPSTAT_PARAMS: "-P ALL 1"
+
+  # in according to the stack it will use either perf record or asprof
+  APP_PROF_ENABLED: false
+
+  ASPROF_RELEASE_URL: https://github.com/async-profiler/async-profiler/releases/download/v${{ASPROF_VERSION:3.0}}/async-profiler-${{ASPROF_VERSION:3.0}}-linux-x64.tar.gz
+  ASPROF_VERSION: "3.0"
+  ASPROF_DIR: /tmp/async-profiler
+  ASPROF_PARAMS:
+  ASPROF_EVENT: cpu
+  ASPROF_FORMAT: flamegraph
+  ASPROF_OUT_DIR: /tmp/async-profiler-output
+  ASPROF_FORMATS: |
+    {
+      "jfr": "jfr",
+      "flamegraph": "html"
+    }

@@ -26,6 +26,7 @@ public class PerfProcessor {
             if (payload instanceof GHEventPayload.IssueComment issueComment) {
                 Log.info("Received start event from issue " + issueComment.getIssue().getNumber());
                 // TODO: simulate job execution
+
                 issueComment.getIssue().comment(":wave: Performance test completed.");
             }
         }
