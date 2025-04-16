@@ -16,6 +16,7 @@ roles:
       - run-strace
       - run-perfstat
     cleanup-scripts:
+      - export-results
       - cleanup-sut
       - cleanup-profiling
 

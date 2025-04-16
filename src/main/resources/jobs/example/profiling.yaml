@@ -130,16 +130,17 @@ scripts:
   # RSS (min, max, mean)
   # CPU usage (min, max, mean)
   # vmstat? mpstat?
-  export-metrics:
+  export-results:
     # stats for pidstat
     - js: ${{PIDSTAT_ENABLED}}
       then:
         - wait-for: HF_BENCHMARK_STARTED
         - script: parse-pidstat-results
           with:
-            PIDSTAT_FILE: /tmp/HEROES_pidstat_${{FILE_ID:all}}.log
-            MAX_STATE: ${{FILE_ID:all}}_HEROES_CPU_USAGE_MAX
-            AVG_STATE: ${{FILE_ID:all}}_HEROES_CPU_USAGE_AVG
+            PIDSTAT_FILE: /tmp/pidstat_${{FILE_ID:all}}.log
+            MAX_STATE: ${{FILE_ID:all}}_CPU_USAGE_MAX
+            AVG_STATE: ${{FILE_ID:all}}_CPU_USAGE_AVG
+    - sh: cp /tmp/hyperfoil/run/${{HF_RUN_ID}}/all.json ${{RESULTS_FILE}}
 
   cleanup-profiling:
     - sh:
@@ -188,3 +189,5 @@ states:
       "jfr": "jfr",
       "flamegraph": "html"
     }
+
+  RESULTS_FILE: /tmp/result.json

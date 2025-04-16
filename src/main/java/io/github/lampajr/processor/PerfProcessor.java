@@ -1,5 +1,7 @@
 package io.github.lampajr.processor;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.lampajr.Util;
 import io.github.lampajr.benchmark.Benchmark;
 import io.github.lampajr.model.StartTestEvent;
@@ -18,7 +20,6 @@ import java.io.InputStream;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Future;
 
 @Startup
 @ApplicationScoped
@@ -26,6 +27,9 @@ public class PerfProcessor {
 
     @Inject
     Storage storage;
+
+    @Inject
+    ObjectMapper objectMapper;
 
     private final Map<String, Benchmark> benchmarks;
 
@@ -75,18 +79,35 @@ public class PerfProcessor {
         }
     }
 
-    void runBenchmark(Benchmark benchmark) throws IOException, InterruptedException {
+    void runBenchmark(Benchmark benchmark) throws InterruptedException, IOException {
         // TODO: this should NOT be blocking
         File log = new File("/tmp/test.log");
+        File errorLog = new File("/tmp/test.error.log");
         ProcessBuilder builder = new ProcessBuilder()
                 .command("bash", "-c", benchmark.script)
-                .redirectOutput(ProcessBuilder.Redirect.appendTo(log))
-                .redirectError(ProcessBuilder.Redirect.appendTo(log));
+                .redirectOutput(ProcessBuilder.Redirect.to(log))
+                .redirectError(ProcessBuilder.Redirect.to(errorLog));
         // need to add jbang to the path to properly run it
         builder.environment().put("PATH", "/home/alampare/.local/share/mise/installs/jbang/0.125.1/bin:" + System.getenv("PATH"));
         Process process = builder.start();
 
         int exitCode = process.waitFor();
+        if (exitCode != 0) {
+            Log.error("Benchmark exited with code " + exitCode);
+            //  issueComment.getIssue().comment(":bangbang: Benchmark exited with code " + exitCode);
+            return;
+        }
         Log.info("Benchmark exited with code " + exitCode);
+
+        JsonNode result = null;
+        try {
+            result = objectMapper.readValue(new File(benchmark.result), JsonNode.class);
+        } catch (IOException e) {
+            Log.error("Error reading result from file " + benchmark.result, e);
+            //  issueComment.getIssue().comment(":bangbang: Benchmark complete but cannot find results at " + benchmark.result);
+        }
+
+        // TODO: convert the json result (assuming of depth 1) into a markdown table to get back into the PR
+        Log.info("Benchmark result: " + result);
     }
 }
