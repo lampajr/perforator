@@ -28,9 +28,10 @@ class GithubEventHandler {
 
         // TODO: implement more robust parsing logic
         String[] comment = issueComment.getComment().getBody().split(" ");
-        if (comment.length > 0 && comment[0].equalsIgnoreCase(prompt) && issueComment.getIssue().isPullRequest()) {
+        // /perforator run <test-id>
+        if (comment.length > 2 && comment[0].equalsIgnoreCase(prompt) && comment[1].equalsIgnoreCase("run") && issueComment.getIssue().isPullRequest()) {
             // send back an early feedback that the command is received
-            issueComment.getIssue().comment(":wave: Thanks for using Perforator! Starting performance test..");
+//            issueComment.getIssue().comment(":wave: Thanks for using Perforator! Starting performance test..");
             storage.addStartEvent(issueComment);
         }
     }
