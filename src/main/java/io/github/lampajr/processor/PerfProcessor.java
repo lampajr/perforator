@@ -31,6 +31,9 @@ public class PerfProcessor {
     @Inject
     ObjectMapper objectMapper;
 
+    @Inject
+    ResultConverter resultConverter;
+
     private final Map<String, Benchmark> benchmarks;
 
     PerfProcessor() {
@@ -87,8 +90,6 @@ public class PerfProcessor {
                 .command("bash", "-c", benchmark.script)
                 .redirectOutput(ProcessBuilder.Redirect.to(log))
                 .redirectError(ProcessBuilder.Redirect.to(errorLog));
-        // need to add jbang to the path to properly run it
-        builder.environment().put("PATH", "/home/alampare/.local/share/mise/installs/jbang/0.125.1/bin:" + System.getenv("PATH"));
         Process process = builder.start();
 
         int exitCode = process.waitFor();
