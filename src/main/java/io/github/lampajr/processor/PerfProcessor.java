@@ -12,6 +12,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.reactive.messaging.Incoming;
 import org.kohsuke.github.GHEventPayload;
+import org.kohsuke.github.GHIssue;
 import org.yaml.snakeyaml.Yaml;
 
 import java.io.File;
@@ -71,19 +72,24 @@ public class PerfProcessor {
                 Benchmark benchmark = benchmarks.get(benchmarkId);
                 if (benchmark == null) {
                     Log.error("Cannot find benchmark with id " + benchmarkId);
-//                    issueComment.getIssue().comment(":bangbang: Cannot find benchmark with id " + benchmarkId);
+                    issueComment.getIssue().comment(":bangbang: Cannot find benchmark with id '" + benchmarkId + "'");
                     return;
                 }
 
                 // run job and look for the file result
-                runBenchmark(benchmark);
-//                issueComment.getIssue().comment(":wave: Performance test completed.");
+                runBenchmark(benchmark, issueComment.getIssue());
             }
         }
     }
 
-    void runBenchmark(Benchmark benchmark) throws InterruptedException, IOException {
-        // TODO: this should NOT be blocking
+    // TODO: this should NOT be blocking
+    void runBenchmark(Benchmark benchmark, GHIssue issue) throws InterruptedException, IOException {
+        // comment to post into the issue
+        StringBuilder comment = new StringBuilder()
+                .append("You benchmark ")
+                .append(benchmark.id)
+                .append(" completed successfully.\n\n");
+
         File log = new File("/tmp/test.log");
         File errorLog = new File("/tmp/test.error.log");
         ProcessBuilder builder = new ProcessBuilder()
@@ -95,7 +101,7 @@ public class PerfProcessor {
         int exitCode = process.waitFor();
         if (exitCode != 0) {
             Log.error("Benchmark exited with code " + exitCode);
-            //  issueComment.getIssue().comment(":bangbang: Benchmark exited with code " + exitCode);
+            issue.comment(":bangbang: Benchmark execution failed, pls contact your administrators");
             return;
         }
         Log.info("Benchmark exited with code " + exitCode);
@@ -105,10 +111,12 @@ public class PerfProcessor {
             result = objectMapper.readValue(new File(benchmark.result), JsonNode.class);
         } catch (IOException e) {
             Log.error("Error reading result from file " + benchmark.result, e);
-            //  issueComment.getIssue().comment(":bangbang: Benchmark complete but cannot find results at " + benchmark.result);
+            issue.comment(":bangbang: Benchmark completed but cannot find results at " + benchmark.result);
+            return;
         }
-
-        // TODO: convert the json result (assuming of depth 1) into a markdown table to get back into the PR
         Log.info("Benchmark result: " + result);
+
+        comment.append(resultConverter.toMarkdown(result));
+        issue.comment(comment.toString());
     }
 }

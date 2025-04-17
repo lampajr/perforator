@@ -6,13 +6,9 @@ import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
-import org.eclipse.microprofile.reactive.messaging.Channel;
-import org.eclipse.microprofile.reactive.messaging.Emitter;
-import org.eclipse.microprofile.reactive.messaging.OnOverflow;
 import org.kohsuke.github.GHEventPayload;
 
 import java.io.IOException;
-import java.util.UUID;
 
 @ApplicationScoped
 class GithubEventHandler {
@@ -29,9 +25,10 @@ class GithubEventHandler {
         // TODO: implement more robust parsing logic
         String[] comment = issueComment.getComment().getBody().split(" ");
         // /perforator run <test-id>
-        if (comment.length > 2 && comment[0].equalsIgnoreCase(prompt) && comment[1].equalsIgnoreCase("run") && issueComment.getIssue().isPullRequest()) {
+        if (comment.length > 2 && comment[0].equalsIgnoreCase(prompt) && comment[1].equalsIgnoreCase(
+                "run") && issueComment.getIssue().isPullRequest()) {
             // send back an early feedback that the command is received
-//            issueComment.getIssue().comment(":wave: Thanks for using Perforator! Starting performance test..");
+            issueComment.getIssue().comment(":wave: Thanks for using Perforator! \n\nStarting performance test..");
             storage.addStartEvent(issueComment);
         }
     }
