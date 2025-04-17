@@ -1,0 +1,18 @@
+# started on Fri Apr 18 05:47:14 2025
+
+ Performance counter stats for process id '3526889':
+
+        711,934.47 msec task-clock                #    1.637 CPUs utilized
+         6,080,646      context-switches          #    8.541 K/sec
+           545,577      cpu-migrations            #  766.330 /sec
+           199,955      page-faults               #  280.862 /sec
+ 2,175,526,178,854      cycles                    #    3.056 GHz                      (50.02%)
+ 2,043,173,387,366      instructions              #    0.94  insn per cycle           (62.50%)
+   458,110,321,982      branches                  #  643.473 M/sec                    (62.49%)
+    10,222,949,759      branch-misses             #    2.23% of all branches          (62.49%)
+   596,544,141,860      L1-dcache-loads           #  837.920 M/sec                    (62.50%)
+    35,985,222,264      L1-dcache-load-misses     #    6.03% of all L1-dcache accesses  (62.48%)
+    10,552,959,047      LLC-loads                 #   14.823 M/sec                    (50.02%)
+     1,256,607,995      LLC-load-misses           #   11.91% of all LL-cache accesses  (50.00%)
+
+     434.824526919 seconds time elapsed

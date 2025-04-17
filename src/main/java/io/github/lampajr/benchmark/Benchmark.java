@@ -1,5 +1,7 @@
 package io.github.lampajr.benchmark;
 
+import java.util.Map;
+
 /**
  * This class represents a benchmark configuration
  */
@@ -11,4 +13,5 @@ public class Benchmark {
     // full path where the result obtained from the job is stored
     public String result;
 
+    public Map<String, String> artifacts;
 }

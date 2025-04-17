@@ -1,4 +1,8 @@
-id: webhook-example-qdup
-name: Webhook Example qDup test
+id: webhook-example-bash
+name: Webhook example using bash script
 script: /home/alampare/repos/perforator/src/main/resources/jobs/example/run.sh
 result: /tmp/result.json
+artifacts:
+  perf_stat: /tmp/perf-stat.txt
+  report_html: /tmp/report.html
+  result: /tmp/result.json

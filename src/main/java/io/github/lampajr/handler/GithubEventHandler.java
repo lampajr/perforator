@@ -24,12 +24,20 @@ class GithubEventHandler {
 
         // TODO: implement more robust parsing logic
         String[] comment = issueComment.getComment().getBody().split(" ");
-        // /perforator run <test-id>
-        if (comment.length > 2 && comment[0].equalsIgnoreCase(prompt) && comment[1].equalsIgnoreCase(
-                "run") && issueComment.getIssue().isPullRequest()) {
-            // send back an early feedback that the command is received
-            issueComment.getIssue().comment(":wave: Thanks for using Perforator! \n\nStarting performance test..");
-            storage.addStartEvent(issueComment);
+        if (comment.length > 2 && comment[0].equalsIgnoreCase(prompt) && issueComment.getIssue().isPullRequest()) {
+            if (comment[1].equalsIgnoreCase("run")) {
+                // /perforator run <test-id>
+                // send back an early feedback that the command is received
+                issueComment.getIssue().comment(":wave: Thanks for using Perforator! \n\nStarting performance test..");
+                storage.addStartEvent(issueComment);
+            } else if (comment.length > 4 && comment[1].equalsIgnoreCase("get") && comment[3].equalsIgnoreCase("from")) {
+                // /perforator get <artifact-name> from <test-id>
+                // send back an early feedback that the command is received
+                issueComment.getIssue()
+                        .comment(":hourglass_flowing_sand: Retrieving artifact " + comment[2] + " from " + comment[4]);
+                storage.addDownloadArtifactEvent(comment[4], comment[2], issueComment);
+            }
+
         }
     }
 }
