@@ -1,14 +1,20 @@
 package io.github.lampajr.processor;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.github.lampajr.model.Metric;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 
 import java.util.Iterator;
 import java.util.Map;
 
 @ApplicationScoped
 public class ResultConverter {
+
+    @Inject
+    ObjectMapper objectMapper;
 
     /**
      * Convert the provided JSON result object into a table markdown string
@@ -35,7 +41,9 @@ public class ResultConverter {
 
                 // data
                 data.fields().forEachRemaining(elem -> {
-                    builder.append("| ").append(elem.getKey()).append(" | ").append(elem.getValue().asText()).append(" |")
+                    Metric m = objectMapper.convertValue(elem.getValue(), Metric.class);
+                    builder.append("| ").append(elem.getKey()).append(" | ").append(m.value).append(" ").append(m.unit)
+                            .append(" |")
                             .append("\n");
                 });
 

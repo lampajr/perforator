@@ -1,6 +1,6 @@
-id: webhook-example-bash
+id: test1
 name: Webhook example using bash script
-script: /home/alampare/repos/perforator/src/main/resources/jobs/example/run.sh
+script: /home/alampare/repos/perforator/src/main/resources/jobs/example/example1/run.sh
 result: /tmp/result.json
 artifacts:
   perf_stat: /tmp/perf-stat.txt

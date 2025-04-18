@@ -12,6 +12,7 @@ import io.quarkus.runtime.Startup;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.apache.commons.io.FilenameUtils;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.eclipse.microprofile.reactive.messaging.Incoming;
 import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GHIssue;
@@ -26,10 +27,14 @@ import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @Startup
 @ApplicationScoped
 public class PerfProcessor {
+
+    @ConfigProperty(name = "perforator.pattern")
+    String runIdPattern;
 
     @Inject
     Storage storage;
@@ -62,9 +67,17 @@ public class PerfProcessor {
 
     @Incoming("download-artifact-in")
     public void processDownloadArtifact(String uuid) throws IOException {
-        DownloadArtifactEvent event = storage.getDownloadArtifactEvent(uuid);
+        DownloadArtifactEvent event = storage.popDownloadArtifactEvent(uuid);
         if (event == null) {
             Log.error("Cannot find download artifact event with " + uuid);
+            return;
+        }
+
+        StartTestEvent run = storage.getStartEvent(event.runId);
+        if (run == null) {
+            Log.error("Cannot find run with " + event.runId);
+        } else if (!Objects.equals(run.benchmarkId, event.benchmarkId)) {
+            Log.error("Trying to get artifact from run with different benchmark id " + event.benchmarkId);
         } else {
             GHEventPayload payload = event.payload;
             if (payload instanceof GHEventPayload.IssueComment issueComment) {
@@ -83,7 +96,7 @@ public class PerfProcessor {
                 }
 
                 // get file and post it to the issue based on the extension (e.g., txt or html or png if possible)
-                getBenchmarkArtifact(benchmark, issueComment.getIssue(), event.artifactId, artifactLocation);
+                getBenchmarkArtifact(event.runId, issueComment.getIssue(), event.artifactId, artifactLocation);
             }
 
         }
@@ -99,26 +112,23 @@ public class PerfProcessor {
             if (payload instanceof GHEventPayload.IssueComment issueComment) {
                 Log.info("Received start event from issue " + issueComment.getIssue().getNumber());
 
-                // /perforator run <test-id>
-                String[] comment = issueComment.getComment().getBody().split(" ");
-                String benchmarkId = comment[2];
-
-                Benchmark benchmark = benchmarks.get(benchmarkId);
+                Benchmark benchmark = benchmarks.get(event.benchmarkId);
                 if (benchmark == null) {
-                    Log.error("Cannot find benchmark with id " + benchmarkId);
-                    issueComment.getIssue().comment(":x: Cannot find benchmark with id '" + benchmarkId + "'");
+                    Log.error("Cannot find benchmark with id " + event.benchmarkId);
+                    issueComment.getIssue().comment(":x: Cannot find benchmark with id '" + event.benchmarkId + "'");
                     return;
                 }
 
                 // run job and look for the file result
-                runBenchmark(benchmark, issueComment.getIssue());
+                runBenchmark(benchmark, uuid, issueComment.getIssue());
             }
         }
     }
 
-    void getBenchmarkArtifact(Benchmark benchmark, GHIssue issue, String artifactId, String artifactLocation)
+    void getBenchmarkArtifact(String runId, GHIssue issue, String artifactId, String artifactLocation)
             throws IOException {
         StringBuilder comment = new StringBuilder();
+        artifactLocation = artifactLocation.replace(runIdPattern, runId);
         String extension = FilenameUtils.getExtension(artifactLocation);
         switch (extension) {
             case "txt":
@@ -137,7 +147,8 @@ public class PerfProcessor {
                 comment.append(":x: Image extension not supported!");
                 //                break;
             default:
-                comment.append("The artifact you asked for can be found at: ").append(artifactLocation);
+                comment.append("The artifact you asked for can be found at: [").append(artifactLocation).append("](")
+                        .append(artifactLocation).append(")");
                 break;
         }
 
@@ -145,7 +156,7 @@ public class PerfProcessor {
     }
 
     // TODO: this should NOT be blocking
-    void runBenchmark(Benchmark benchmark, GHIssue issue) throws InterruptedException, IOException {
+    void runBenchmark(Benchmark benchmark, String runId, GHIssue issue) throws InterruptedException, IOException {
         // comment to post into the issue
         StringBuilder comment = new StringBuilder()
                 .append("You benchmark ")
@@ -155,7 +166,7 @@ public class PerfProcessor {
         File log = new File("/tmp/test.log");
         File errorLog = new File("/tmp/test.error.log");
         ProcessBuilder builder = new ProcessBuilder()
-                .command("bash", "-c", benchmark.script)
+                .command("bash", "-c", benchmark.script + " " + runId)
                 .redirectOutput(ProcessBuilder.Redirect.to(log))
                 .redirectError(ProcessBuilder.Redirect.to(errorLog));
         Process process = builder.start();
@@ -170,7 +181,7 @@ public class PerfProcessor {
 
         JsonNode result = null;
         try {
-            result = objectMapper.readValue(new File(benchmark.result), JsonNode.class);
+            result = objectMapper.readValue(new File(benchmark.result.replace(runIdPattern, runId)), JsonNode.class);
         } catch (IOException e) {
             Log.error("Error reading result from file " + benchmark.result, e);
             issue.comment(":x: Benchmark completed but cannot find results at " + benchmark.result);

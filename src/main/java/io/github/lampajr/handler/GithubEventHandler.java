@@ -28,14 +28,17 @@ class GithubEventHandler {
             if (comment[1].equalsIgnoreCase("run")) {
                 // /perforator run <test-id>
                 // send back an early feedback that the command is received
-                issueComment.getIssue().comment(":wave: Thanks for using Perforator! \n\nStarting performance test..");
-                storage.addStartEvent(issueComment);
-            } else if (comment.length > 4 && comment[1].equalsIgnoreCase("get") && comment[3].equalsIgnoreCase("from")) {
-                // /perforator get <artifact-name> from <test-id>
+                String runId = storage.addStartEvent(comment[2], issueComment);
+                issueComment.getIssue()
+                        .comment(":wave: Thanks for using Perforator! \n\nStarting performance test run " + runId + "..");
+            } else if (comment.length > 6 && comment[1].equalsIgnoreCase("get") && comment[3].equalsIgnoreCase(
+                    "from") && comment[5].equalsIgnoreCase("of")) {
+                // /perforator get <artifact-name> from <run-id> of <test-id>
                 // send back an early feedback that the command is received
                 issueComment.getIssue()
-                        .comment(":hourglass_flowing_sand: Retrieving artifact " + comment[2] + " from " + comment[4]);
-                storage.addDownloadArtifactEvent(comment[4], comment[2], issueComment);
+                        .comment(":hourglass_flowing_sand: Retrieving artifact " + comment[2] + " from " + comment[6]);
+
+                storage.addDownloadArtifactEvent(comment[6], comment[4], comment[2], issueComment);
             }
 
         }

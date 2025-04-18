@@ -22,26 +22,32 @@ public class Storage {
     @Channel("download-artifact-out")
     Emitter<String> downloadArtifactEmitter;
 
+    // in this PoC we can see each start event as a run
     ConcurrentHashMap<String, StartTestEvent> startEvents = new ConcurrentHashMap<>();
     ConcurrentHashMap<String, DownloadArtifactEvent> downloadArtifactEvents = new ConcurrentHashMap<>();
 
-    public void addStartEvent(GHEventPayload.IssueComment issueComment) {
+    public String addStartEvent(String benchmarkId, GHEventPayload.IssueComment issueComment) {
         String uuid = UUID.randomUUID().toString();
-        startEvents.put(uuid, new StartTestEvent(issueComment));
+        startEvents.put(uuid, new StartTestEvent(benchmarkId, issueComment));
         startEventEmitter.send(uuid);
+        return uuid;
     }
 
     public StartTestEvent getStartEvent(String uuid) {
+        return startEvents.get(uuid);
+    }
+
+    public StartTestEvent removeStartEvent(String uuid) {
         return startEvents.remove(uuid);
     }
 
-    public void addDownloadArtifactEvent(String benchmarkId, String artifactId, GHEventPayload payload) {
+    public void addDownloadArtifactEvent(String benchmarkId, String runId, String artifactId, GHEventPayload payload) {
         String uuid = UUID.randomUUID().toString();
-        downloadArtifactEvents.put(uuid, new DownloadArtifactEvent(benchmarkId, artifactId, payload));
+        downloadArtifactEvents.put(uuid, new DownloadArtifactEvent(benchmarkId, runId, artifactId, payload));
         downloadArtifactEmitter.send(uuid);
     }
 
-    public DownloadArtifactEvent getDownloadArtifactEvent(String uuid) {
+    public DownloadArtifactEvent popDownloadArtifactEvent(String uuid) {
         return downloadArtifactEvents.remove(uuid);
     }
 }
