@@ -1,0 +1,9 @@
+id: test3
+name: Webhook example using bash script and params
+script: /home/alampare/repos/perforator/src/main/resources/jobs/example/example3/run.sh
+result: /tmp/%run_id%/result.json
+baseline: /tmp/%run_id%/baseline.json
+artifacts:
+  perf_stat: /tmp/%run_id%/perf-stat.txt
+  report_html: /tmp/%run_id%/report.html
+  result: /tmp/%run_id%/result.json

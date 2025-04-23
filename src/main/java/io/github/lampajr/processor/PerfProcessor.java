@@ -120,7 +120,7 @@ public class PerfProcessor {
                 }
 
                 // run job and look for the file result
-                runBenchmark(benchmark, uuid, issueComment.getIssue());
+                runBenchmark(benchmark, uuid, event.withBaseline, issueComment.getIssue());
             }
         }
     }
@@ -156,7 +156,8 @@ public class PerfProcessor {
     }
 
     // TODO: this should NOT be blocking
-    void runBenchmark(Benchmark benchmark, String runId, GHIssue issue) throws InterruptedException, IOException {
+    void runBenchmark(Benchmark benchmark, String runId, boolean useBaseline, GHIssue issue)
+            throws InterruptedException, IOException {
         // comment to post into the issue
         StringBuilder comment = new StringBuilder()
                 .append("You benchmark ")
@@ -179,7 +180,8 @@ public class PerfProcessor {
         }
         Log.info("Benchmark exited with code " + exitCode);
 
-        JsonNode result = null;
+        JsonNode result;
+        JsonNode baseline = null;
         try {
             result = objectMapper.readValue(new File(benchmark.result.replace(runIdPattern, runId)), JsonNode.class);
         } catch (IOException e) {
@@ -189,7 +191,18 @@ public class PerfProcessor {
         }
         Log.info("Benchmark result: " + result);
 
-        comment.append(resultConverter.toMarkdown(result));
+        if (useBaseline) {
+            try {
+                baseline = objectMapper.readValue(new File(benchmark.baseline.replace(runIdPattern, runId)), JsonNode.class);
+            } catch (IOException e) {
+                Log.error("Error reading baseline from file " + benchmark.baseline, e);
+                issue.comment(":x: Benchmark completed but cannot find baseline at " + benchmark.baseline);
+                return;
+            }
+        }
+        Log.info("Benchmark baseline: " + baseline);
+
+        comment.append(resultConverter.toMarkdown(result, baseline));
         issue.comment(comment.toString());
     }
 }

@@ -1,0 +1,52 @@
+{
+  "Latencies": {
+    "RPS": {
+      "value": 1000,
+      "unit": "req/s"
+    },
+    "99_999th percentile": {
+      "value": 1150,
+      "unit": "ms"
+    },
+    "99th percentile": {
+      "value": 1010,
+      "unit": "ms"
+    },
+    "95th percentile": {
+      "value": 789,
+      "unit": "ms"
+    },
+    "average": {
+      "value": 30,
+      "unit": "ms"
+    },
+    "max": {
+      "value": 1150,
+      "unit": "ms"
+    },
+    "min": {
+      "value": 5,
+      "unit": "ms"
+    }
+  },
+  "CPU usage at steady state": {
+    "average": {
+      "value": 160,
+      "unit": "%"
+    },
+    "max": {
+      "value": 240,
+      "unit": "%"
+    }
+  },
+  "CPU usage at startup": {
+    "average": {
+      "value": 250,
+      "unit": "%"
+    },
+    "max": {
+      "value": 300,
+      "unit": "%"
+    }
+  }
+}

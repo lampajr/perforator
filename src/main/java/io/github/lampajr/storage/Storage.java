@@ -28,7 +28,8 @@ public class Storage {
 
     public String addStartEvent(String benchmarkId, GHEventPayload.IssueComment issueComment) {
         String uuid = UUID.randomUUID().toString();
-        startEvents.put(uuid, new StartTestEvent(benchmarkId, issueComment));
+        startEvents.put(uuid, new StartTestEvent(benchmarkId,
+                issueComment != null && issueComment.getComment().getBody().contains("with baseline"), issueComment));
         startEventEmitter.send(uuid);
         return uuid;
     }

@@ -52,4 +52,42 @@ public class ResultConverter {
         }
         return builder.toString();
     }
+
+    public String toMarkdown(JsonNode result, JsonNode baseline) {
+        if (baseline == null) {
+            return toMarkdown(result);
+        }
+        StringBuilder builder = new StringBuilder();
+        if (result.isObject() && baseline.isObject()) {
+            ObjectNode resAsObject = (ObjectNode) result;
+            ObjectNode baseAsObject = (ObjectNode) baseline;
+            Iterator<Map.Entry<String, JsonNode>> it = resAsObject.fields();
+            while (it.hasNext()) {
+                Map.Entry<String, JsonNode> table = it.next();
+                String title = table.getKey();
+                ObjectNode resData = (ObjectNode) table.getValue();
+                ObjectNode baseData = (ObjectNode) baseAsObject.get(table.getKey());
+
+                // title
+                builder.append("### ").append(title).append("\n").append("\n");
+
+                // columns
+                builder.append("| Metric | Value | Baseline | Delta |").append("\n");
+                builder.append("| ------ |:-----:|:-----:|:-----:|").append("\n");
+
+                // data
+                resData.fields().forEachRemaining(elem -> {
+                    Metric m = objectMapper.convertValue(elem.getValue(), Metric.class);
+                    Metric baseM = objectMapper.convertValue(baseData.get(elem.getKey()), Metric.class);
+                    builder.append("| ").append(elem.getKey()).append(" | ").append(m.value).append(" ").append(m.unit)
+                            .append(" | ").append(baseM.value).append(" ").append(baseM.unit).append(" | ")
+                            .append(Integer.parseInt(m.value) < Integer.parseInt(baseM.value) ? ":white_check_mark:" : ":x:")
+                            .append(" |").append("\n");
+                });
+
+                builder.append("\n");
+            }
+        }
+        return builder.toString();
+    }
 }

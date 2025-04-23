@@ -12,6 +12,8 @@ public class Benchmark {
     public String script;
     // full path where the result obtained from the job is stored
     public String result;
+    // full path where the baseline is stored
+    public String baseline;
 
     public Map<String, String> artifacts;
 }
